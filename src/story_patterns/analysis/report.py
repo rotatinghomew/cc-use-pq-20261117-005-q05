@@ -6,6 +6,7 @@ from typing import Any
 from story_patterns.catalog.validate import canonical_json, digest_json
 from story_patterns.analysis.agreement import pairwise_agreement
 from story_patterns.analysis.evidence import evidence_coverage
+from story_patterns.analysis.event_ordering import build_event_ordering_section, ordering_mode
 from story_patterns.analysis.sensitivity import leave_one_reader_out
 from story_patterns.analysis.revision_drift import compare_revisions
 from story_patterns.analysis.votes import vote_distribution
@@ -58,6 +59,9 @@ def build_report(stories: list[dict], decisions: dict[tuple[str, int], list[dict
         if final_outcome not in {None, "unknown"}:
             final_outcome_counts[final_outcome] += 1
         used_decisions.extend(item["decision_id"] for item in votes)
+        from story_patterns.catalog.ordering import summarize_ordering
+
+        ordering_summary = summarize_ordering(story["events"], ordering_mode(story))
         story_results.append({
             "story_id": story["story_id"], "revision": story["revision"],
             "title": story["title"], "tradition": story["tradition"],
@@ -69,6 +73,13 @@ def build_report(stories: list[dict], decisions: dict[tuple[str, int], list[dict
             "adjudication_rationale": adjudication["rationale"] if adjudication else None,
             "adjudication_evidence_event_ids": adjudication["evidence_event_ids"] if adjudication else [],
             "reviewer_count": len(votes),
+            "ordering_mode": ordering_summary["ordering_mode"],
+            "ordering_state": ordering_summary["ordering_state"],
+            "cross_chapter": ordering_summary["cross_chapter"],
+            "chapter_count": ordering_summary["chapter_count"],
+            "source_gap_count": len(ordering_summary["source_gaps"]),
+            "duplicate_source_reference_count": len(ordering_summary["duplicate_source_references"]),
+            "reordered_event_count": len(ordering_summary["reordered_event_ids"]),
         })
     return {
         "criteria": {"tradition": tradition, "minimum_reviewers": minimum,
@@ -96,6 +107,7 @@ def build_report(stories: list[dict], decisions: dict[tuple[str, int], list[dict
         "revision_lineage": {"scope": "selected story revisions", "stories": revision_lineage(stories),
                              "warnings": lineage_warnings(revision_lineage(stories))},
         "revision_changes": compare_revisions(stories),
+        "event_ordering": build_event_ordering_section(stories, decisions),
         "provenance": {
             "story_revisions": [f"{item['story_id']}@{item['revision']}" for item in stories],
             "decision_ids": sorted(used_decisions),
@@ -104,6 +116,10 @@ def build_report(stories: list[dict], decisions: dict[tuple[str, int], list[dict
                 f"{story_id}@{revision}": sorted(batch_ids)
                 for (story_id, revision), batch_ids in sorted((origins or {}).items())
             },
+            "evidence_binding": (
+                "decisions cite event ids within their own story revision only; "
+                "older judgments are never re-pointed at events in a newer revision"
+            ),
         },
     }
 

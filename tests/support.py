@@ -31,6 +31,37 @@ def batch(stories=None, batch_id="batch-a"):
     return {"batch_id": batch_id, "stories": stories if stories is not None else [story()]}
 
 
+def dual_order_story(story_id="tale-dual", revision=1, tradition="coast", events=None,
+                     chapters=("ch-1", "ch-2")):
+    """使用显式双轨字段（章节、源位置、分析次序）的故事，与旧式 sequence 区分。"""
+    if events is None:
+        # 默认：跨章节、源位置有缺段，分析次序与源位置自然顺序一致。
+        events = [
+            {"event_id": "e1", "chapter": chapters[0], "source_position": 1,
+             "analysis_order": 1, "actor_id": "eldest", "action": "opens the road",
+             "consequence": "path closes", "evidence": "Source ch-1 pos 1"},
+            {"event_id": "e2", "chapter": chapters[0], "source_position": 3,
+             "analysis_order": 2, "actor_id": "middle", "action": "tries again",
+             "consequence": "path narrows", "evidence": "Source ch-1 pos 3 (pos 2 missing)"},
+            {"event_id": "e3", "chapter": chapters[1], "source_position": 1,
+             "analysis_order": 3, "actor_id": "youngest", "action": "reaches shelter",
+             "consequence": "group is safe", "evidence": "Source ch-2 pos 1"},
+        ]
+    return {
+        "story_id": story_id,
+        "revision": revision,
+        "title": f"Local dual-order tale {story_id}",
+        "tradition": tradition,
+        "source": {"reference": "Synthetic chapter excerpts", "kind": "local_synthetic"},
+        "characters": [
+            {"character_id": "eldest", "name": "Elder", "sibling_order": 1},
+            {"character_id": "middle", "name": "Middle", "sibling_order": 2},
+            {"character_id": "youngest", "name": "Young", "sibling_order": 3},
+        ],
+        "events": events,
+    }
+
+
 def decision(story_id="tale-a", revision=1, annotator="reader-a", sequence=1,
              pattern="parallel", outcome="wins", decision_id=None, evidence=None):
     return {

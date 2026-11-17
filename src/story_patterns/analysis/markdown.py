@@ -36,6 +36,21 @@ def render_report(report: dict) -> str:
     coverage = report["coverage"]["pattern"]
     lines.extend(_table([{"status": key, "count": value} for key, value in coverage.items()],
                         [("status", "Pattern review status"), ("count", "Stories")]))
+    if "event_ordering" in report:
+        ordering = report["event_ordering"]
+        lines.extend([
+            "", "## Event ordering", "",
+            "Source position (chapter + source_position) cites the original text; analysis_order is the "
+            "per-revision research sequence and may legitimately reorder it.", "",
+            f"- Cross-chapter revisions: {len(ordering['cross_chapter_story_revisions'])}",
+            f"- Source gaps: {ordering['source_gap_count']}",
+            f"- Duplicate source references: {ordering['duplicate_source_reference_count']}",
+            f"- Reordered events: {ordering['reordered_event_count']}", "",
+        ])
+        lines.extend(_table(
+            [{"state": key, "count": value} for key, value in ordering["state_counts"].items()],
+            [("state", "Ordering state"), ("count", "Story revisions")],
+        ))
     lines.extend(["", "## Provenance", "", "Story revisions and decision IDs used:", "",
                   "```json", json.dumps(report["provenance"], ensure_ascii=False, indent=2), "```", ""])
     return "\n".join(lines)

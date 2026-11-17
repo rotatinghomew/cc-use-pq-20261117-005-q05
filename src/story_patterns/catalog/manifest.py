@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from story_patterns.catalog.ordering import ordering_mode, summarize_ordering
+
 
 def build_manifest(batches: list[dict], stories: list[dict]) -> dict:
     by_tradition = {}
@@ -11,8 +13,22 @@ def build_manifest(batches: list[dict], stories: list[dict]) -> dict:
         "tradition_counts": dict(sorted(by_tradition.items())),
         "batches": sorted(batches, key=lambda item: item["batch_id"]),
         "story_revisions": [
-            {"story_id": item["story_id"], "revision": item["revision"],
-             "source_reference": item["source"]["reference"], "source_kind": item["source"]["kind"]}
-            for item in sorted(stories, key=lambda value: (value["story_id"], value["revision"]))
+            _story_revision(story)
+            for story in sorted(stories, key=lambda value: (value["story_id"], value["revision"]))
         ],
+    }
+
+
+def _story_revision(story: dict) -> dict:
+    ordering = summarize_ordering(story["events"], ordering_mode(story))
+    return {
+        "story_id": story["story_id"], "revision": story["revision"],
+        "source_reference": story["source"]["reference"], "source_kind": story["source"]["kind"],
+        "ordering_mode": ordering["ordering_mode"],
+        "ordering_state": ordering["ordering_state"],
+        "cross_chapter": ordering["cross_chapter"],
+        "chapters": ordering["chapters"],
+        "chapter_count": ordering["chapter_count"],
+        "source_gap_count": len(ordering["source_gaps"]),
+        "duplicate_source_reference_count": len(ordering["duplicate_source_references"]),
     }

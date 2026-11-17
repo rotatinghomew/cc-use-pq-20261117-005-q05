@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from story_patterns.catalog.ordering import ordering_mode, ordering_review_summary, summarize_ordering
 from story_patterns.catalog.validate import normalize_story
 from story_patterns.errors import ValidationError
 
@@ -11,6 +12,7 @@ def preview_rows(rows: list[dict]) -> dict:
     valid = []
     errors = []
     seen = defaultdict(list)
+    ordering_notes = []
     for index, raw in enumerate(rows, start=1):
         try:
             story = normalize_story(raw)
@@ -26,10 +28,18 @@ def preview_rows(rows: list[dict]) -> dict:
             for index in indexes:
                 errors.append({"row": index, "story_id": identity[0],
                                "error": "story revision is repeated in this batch"})
+    for index, story in valid:
+        if index in repeated_rows:
+            continue
+        summary = summarize_ordering(story["events"], ordering_mode(story))
+        note = {"row": index, "story_id": story["story_id"], "revision": story["revision"]}
+        note.update(ordering_review_summary(summary))
+        ordering_notes.append(note)
     valid = [(index, story) for index, story in valid if index not in repeated_rows]
     errors.sort(key=lambda item: (item["row"], item["error"]))
     return {"rows_seen": len(rows), "valid_rows": len(valid), "error_count": len(errors),
             "ready": bool(rows) and not errors, "errors": errors,
+            "ordering_notes": ordering_notes,
             "normalized_stories": [story for _, story in valid]}
 
 

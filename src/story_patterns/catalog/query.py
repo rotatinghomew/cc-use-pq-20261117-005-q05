@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from story_patterns.catalog.ordering import ordering_mode, source_location, summarize_ordering
 from story_patterns.errors import ValidationError
 
 
 def search_stories(stories: list[dict], text: str | None = None, tradition: str | None = None,
                    source_kind: str | None = None, sibling_order: int | None = None,
-                   revision_policy: str = "all") -> list[dict]:
+                   revision_policy: str = "all", chapter: str | None = None) -> list[dict]:
     if text is not None and (not isinstance(text, str) or not text.strip()):
         raise ValidationError("text search must be non-empty when provided")
     if tradition is not None and (not isinstance(tradition, str) or not tradition.strip()):
@@ -16,6 +17,8 @@ def search_stories(stories: list[dict], text: str | None = None, tradition: str 
         raise ValidationError("sibling_order must be a positive integer")
     if revision_policy not in {"all", "latest"}:
         raise ValidationError("revision_policy must be all or latest")
+    if chapter is not None and (not isinstance(chapter, str) or not chapter.strip()):
+        raise ValidationError("chapter filter must be non-empty when provided")
     candidates = stories
     if revision_policy == "latest":
         latest = {}
@@ -34,6 +37,9 @@ def search_stories(stories: list[dict], text: str | None = None, tradition: str 
         characters = story["characters"]
         if sibling_order is not None and all(item["sibling_order"] != sibling_order for item in characters):
             continue
+        ordering = summarize_ordering(story["events"], ordering_mode(story))
+        if chapter is not None and chapter not in ordering["chapters"]:
+            continue
         searchable = [story["title"], story["tradition"], story["source"]["reference"]]
         searchable.extend(item["name"] for item in characters)
         searchable.extend(event[field] for event in story["events"] for field in ("action", "consequence", "evidence"))
@@ -42,7 +48,15 @@ def search_stories(stories: list[dict], text: str | None = None, tradition: str 
         matching_events = [event["event_id"] for event in story["events"]
                            if not needle or any(needle in event[field].casefold()
                                                 for field in ("action", "consequence", "evidence"))]
-        result.append({"story_id": story["story_id"], "revision": story["revision"],
-                       "title": story["title"], "tradition": story["tradition"],
-                       "source": story["source"], "matching_event_ids": matching_events})
+        result.append({
+            "story_id": story["story_id"], "revision": story["revision"],
+            "title": story["title"], "tradition": story["tradition"],
+            "source": story["source"], "matching_event_ids": matching_events,
+            "ordering_state": ordering["ordering_state"],
+            "cross_chapter": ordering["cross_chapter"],
+            "chapters": ordering["chapters"],
+            "event_source_locations": {
+                event["event_id"]: source_location(event) for event in story["events"]
+            },
+        })
     return sorted(result, key=lambda item: (item["tradition"], item["story_id"], item["revision"]))

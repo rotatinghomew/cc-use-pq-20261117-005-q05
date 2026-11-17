@@ -49,25 +49,49 @@ class ReviewService:
 
     def queue(self, minimum_reviewers: int = 2, tradition: str | None = None) -> dict:
         from story_patterns.analysis.cohorts import select_cohort, validate_minimum
-        from story_patterns.review.readiness import build_review_queue, queue_totals
+        from story_patterns.review.readiness import (
+            build_review_queue,
+            queue_ordering_totals,
+            queue_totals,
+        )
 
         minimum = validate_minimum(minimum_reviewers)
         stories, decisions, _origins, adjudications = self.store.analysis_snapshot(tradition)
         rows = build_review_queue(select_cohort(stories, tradition), decisions, minimum, adjudications)
-        return {"minimum_reviewers": minimum, "total": len(rows), "by_status": queue_totals(rows), "stories": rows}
+        return {"minimum_reviewers": minimum, "total": len(rows), "by_status": queue_totals(rows),
+                "ordering": queue_ordering_totals(rows), "stories": rows}
 
     def record_adjudication(self, record: dict) -> dict:
         return self.adjudications.record(record)
 
     def history(self, story_id: str, revision: int) -> dict:
+        from story_patterns.catalog.ordering import (
+            event_locations,
+            ordering_mode,
+            ordering_review_summary,
+            summarize_ordering,
+        )
         from story_patterns.errors import NotFoundError
 
-        if self.store.story_document(story_id, revision) is None:
+        story = self.store.story_document(story_id, revision)
+        if story is None:
             raise NotFoundError(f"story revision {story_id!r}/{revision!r} was not found")
         votes, adjudications = self.store.decision_history(story_id, revision)
         latest_by_reader = {item["annotator"]: item["sequence"] for item in votes}
+        locations = event_locations(story["events"])
         for item in votes:
             item["current"] = item["sequence"] == latest_by_reader[item["annotator"]]
-        return {"story_id": story_id, "revision": revision, "decisions": votes,
+            # 每条判断绑定其引用事件在本修订中的源位置；旧判断不会自动指向新版事件。
+            item["evidence_locations"] = {
+                event_id: locations[event_id] for event_id in item["evidence_event_ids"]
+            }
+        for item in adjudications:
+            item["evidence_locations"] = {
+                event_id: locations[event_id] for event_id in item["evidence_event_ids"]
+            }
+        ordering = ordering_review_summary(summarize_ordering(story["events"], ordering_mode(story)))
+        return {"story_id": story_id, "revision": revision,
+                "ordering": ordering, "event_locations": locations,
+                "decisions": votes,
                 "adjudications": adjudications,
                 "active_adjudication_id": adjudications[-1]["adjudication_id"] if adjudications else None}

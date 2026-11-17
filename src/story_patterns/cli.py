@@ -68,6 +68,7 @@ def parser() -> argparse.ArgumentParser:
     search.add_argument("--tradition")
     search.add_argument("--source-kind", choices=("book", "oral_record", "local_synthetic"))
     search.add_argument("--sibling-order", type=int)
+    search.add_argument("--chapter")
     search.add_argument("--revision-policy", choices=("all", "latest"), default="all")
     demo = commands.add_parser("demo", help="replay the bundled synthetic workflow")
     demo.add_argument("--database", required=True)
@@ -120,6 +121,7 @@ def execute(arguments: argparse.Namespace) -> dict:
     if arguments.command == "search":
         return app.search_stories(text=arguments.text, tradition=arguments.tradition,
                                   source_kind=arguments.source_kind, sibling_order=arguments.sibling_order,
+                                  chapter=arguments.chapter,
                                   revision_policy=arguments.revision_policy)
     fixture = read_json(arguments.fixture)
     imported = app.import_batch(fixture["batch"])
